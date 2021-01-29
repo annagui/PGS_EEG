@@ -1,0 +1,190 @@
+###genotype data pre-processing steps and polygenic score (PGS) calculation for
+#"Polygenic contributions to face-sensitive cortical responses in infants with a family history of autism"
+
+#The authors acknowledge use of the research computing facility at King’s College London, Rosalind (https://rosalind.kcl.ac.uk).
+
+
+module load apps/plink/1.9.0b6.10
+
+
+#unzip imputed files and move to target dir
+mv ch* ../brc_scratch/vcf_chrom/
+cd ../brc_scratch/vcf_chrom
+mkdir dose_vcf_files
+
+
+###select only SNPs with info score higher than 0.9
+mv *dose.vcf.gz dose_vcf_files
+mv ../../post_imputation_check/vcfparse.pl ./
+
+
+chmod -R 770 ./
+perl vcfparse.pl –d ./ –o parseBabySibs –g 
+
+bcftools view -e 'R2<0.9' chr1.dose.vcf.gz | gzip -c > chr1.highIS.vcf.gz
+bcftools concat ./*.highIS.vcf.gz | gzip > ../BabySibs.imp.vcf.gz
+
+
+plink --bfile Babysibs.imp --update-ids newids.txt --make-bed --out Babysibs.imp.nids --noweb --allow-no-sex #updated FID 
+# 6653577 variants and 771 people pass filters and QC.
+
+
+##QC
+plink --bfile Babysibs.imp.nids --maf 0.01 --make-bed --out QCimputeFileCommon
+wc -l QCimputeFileCommon.bim
+plink --bfile QCimputeFileCommon --geno 0 --make-bed --out QCimputeFileCommonAndGenotyped
+wc -l QCimputeFileCommonAndGenotyped.bim
+
+
+##update SNP name
+plink --bfile ./QCimputeFileCommonAndGenotyped --list-duplicate-vars --out DupVarsIMP
+wc -l DupVarsIMP.dupvar
+plink --bfile ./QCimputeFileCommonAndGenotyped --exclude DupVarsIMP.dupvar --make-bed --out BabySibsIMP2
+cut -f 2 BabySibsIMP2.bim | sort | uniq -d > SNPdups.dups
+plink --bfile BabySibsIMP2  --exclude SNPdups.dups --make-bed --out BabySibsIMP3
+awk '{print $1,$2, $3, $4}' BabySibsIMP3.bim > BabySibsIMP3.map
+tail -n +2 RsMatcher.txt > RsMatcher2.txt #removed header
+awk '{print $1,$2, $3, $4}' BabySibsIMP3.bim > genomicCoordinatesIMP.txt 
+cut -c 4- RsMatcher2.txt > test.txt
+awk '{print $1":"$3 "\t" $4}' test.txt > test2.txt #rewrites as a CHR:BP (using the chr end position was more successful than start position)
+awk '!x[$1]++ { print $1, $2 }' test2.txt > test6.txt #removed duplicates
+wc -l test6.txt
+
+plink --bfile BabySibsIMP3 --update-map test6.txt --update-name --remove remove_IDs.txt --make-bed --allow-no-sex --out BabySibsIMP4
+# 5692528 variants and 717 people pass filters and QC.
+
+#IBD check to remove duplicates
+plink --bfile BabySibsIMP4 --geno 0.1 --maf 0.1 --mind 0.1 --genome --out BabysibsIMP4.ibd --noweb 
+plink --bfile BabySibsIMP4 --make-bed --remove removeDuplicatesNEW.txt --out BabySibsIMP5
+# 5663312 variants and 648 people pass filters and QC.
+
+#plink --bfile BabySibsIMP5 --geno 0.1 --maf 0.1 --mind 0.1 --genome --out BabysibsIMP5.ibd --noweb #IBD check after excluding duplicates
+
+
+
+plink --bfile BabySibsIMP5 --make-bed --keep Babysibs_EURsamples.txt --out BabySibsIMP5EUR
+# 5663312 variants and 579 people pass filters and QC.
+
+#plink --bfile BabySibsIMP5EUR --geno 0.1 --maf 0.1 --mind 0.1 --genome --out BabysibsIMP5EUR.ibd --noweb #IBD check for ancestry homogeneous sample
+# 3652834 variants and 579 people pass filters and QC.
+
+
+#keep only infants (if siblings, one sibling removed per pair)
+plink --bfile BabySibsIMP5EUR --keep infsibs_EEG.txt --make-bed --out BabySibsIMP5EUR_inf_noSib --allow-no-sex
+#5663312 variants and 234 people pass filters and QC.
+
+
+#QC filter for PGS
+plink --bfile BabySibsIMP5EUR_inf_noSib --geno 0 --maf 0.05 --hardy --hwe 1e-7 --mind 0 --allow-no-sex --make-bed --out BabySibsIMP6_inf_noSib
+#4387033 variants and 234 people pass filters and QC.
+
+#get 5 ancestry PCs
+plink --bfile PGS_EEG/BabySibsIMP6_inf_noSib --pca 5 --make-bed --out PGS_EEG/BabySibsIMP6_inf_noSib_PC --allow-no-sex
+
+cat <(echo -e FID'\t'IID'\t'PC1'\t'PC2'\t'PC3'\t'PC4'\t'PC5) <(tail -n +2 PGS_EEG/BabySibsIMP6_inf_noSib_PC.eigenvec) > PGS_EEG/BabySibsIMP6_inf_noSib_PC.eigenvec_header
+
+
+###run PRSice
+module load apps/R/3.6.0
+
+
+### Autism PGS
+
+#multiple thresholds PGS (N=234)
+
+Rscript PRSice.R --dir ./ \
+--prsice ./PRSice \
+--base iPSYCH-PGC_ASD_Nov2017 \
+--snp SNP \
+--chr CHR \
+--bp BP \
+--A1 A1 \
+--A2 A2 \
+--stat OR \
+--se SE \
+--pvalue P \
+--ld 1000G_chrMerged \
+--target BabySibsIMP6_inf_noSib \
+--binary-target T \
+--no-regress \
+--bar-levels 0.001,0.005,0.01,0.05,0.1,0.15,0.2,0.5,1 \
+--fastscore \
+--score std \
+--cov-file BabySibsIMP6_inf_noSib_PC.eigenvec_header \
+--out prsice_BASIS_234infSibs_noPheno_iPSY2017_EURO.5pcs
+
+
+#best prediction of autism outcome 
+#(211 controls vs 23 cases)
+
+Rscript PRSice.R --dir ./ \
+--prsice ./PRSice \
+--base iPSYCH-PGC_ASD_Nov2017 \
+--snp SNP \
+--chr CHR \
+--bp BP \
+--A1 A1 \
+--A2 A2 \
+--stat OR \
+--se SE \
+--pvalue P \
+--ld 1000G_chrMerged \
+--target PGS_EEG/BabySibsIMP6_inf_noSib \
+--pheno-file infsibs_EEG_Aut.txt \
+--binary-target T \
+--bar-levels 0.001,0.005,0.01,0.05,0.1,0.15,0.2,0.5,1 \
+--fastscore \
+--score std \
+--cov-file BabySibsIMP7_inf_phe_noSib_PC.eigenvec_header \
+--out prsice_BASIS_226infSibs_Pheno_iPSY2017_EURO.5pcs
+
+
+###Cross-disorder traits
+
+#multiple thresholds PGS (N=234)
+
+Rscript PRSice.R --dir ./ \
+--prsice ./PRSice \
+--base iPSYCH_xDx_sumStats_clean_rsOnly_head.txt \
+--snp SNP \
+--chr CHR \
+--bp BP \
+--A1 A1 \
+--A2 A2 \
+--stat OR \
+--pvalue P \
+--ld 1000G_chrMerged \
+--target BabySibsIMP6_inf_noSib \
+--binary-target T \
+--no-regress \
+--bar-levels 0.001,0.005,0.01,0.05,0.1,0.15,0.2,0.5,1 \
+--fastscore \
+--score std \
+--cov-file BabySibsIMP6_inf_noSib_PC.eigenvec_header \
+--out prsice_BASIS_234infSibs_noPheno_xDx_EURO.5pcs
+
+#best prediction of atypical development outcome 
+#(148 controls vs 46 cases)
+
+Rscript PRSice.R --dir ./ \
+--prsice ./PRSice \
+--base iPSYCH_xDx_sumStats_clean_rsOnly_head.txt \
+--snp SNP \
+--chr CHR \
+--bp BP \
+--A1 A1 \
+--A2 A2 \
+--stat OR \
+--pvalue P \
+--ld 1000G_chrMerged \
+--target BabySibsIMP6_inf_noSib \
+--binary-target T \
+--pheno-file PGS_EEG/infsibs_EEG_Aty.txt \
+--bar-levels 0.001,0.005,0.01,0.05,0.1,0.15,0.2,0.5,1 \
+--fastscore \
+--score std \
+--cov-file BabySibsIMP6_inf_noSib_PC.eigenvec_header \
+--out prsice_BASIS_226infSibs_PhenoAty_xDx_EURO.5pcs
+
+
+
