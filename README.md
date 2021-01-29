@@ -11,9 +11,9 @@ Polygenic contributions to face-sensitive cortical responses  in infants with a 
  xDx GWAS: Schork, A. J. et al. A genome-wide association study of shared risk across psychiatric disorders implicates gene regulation during fetal neurodevelopment. Nat. Neurosci. 22, 353–361 (2019).
  
  
- -EEG_PGS_gh.R is the R script for the statistical analyses testing the association between F-N N290 latency and the PGSs.
+ - EEG_PGS_gh.R is the R script for the statistical analyses testing the association between F-N N290 latency and the PGSs.
  
- -EEG_PGS_stats.htlm is the markdown documents including comments to the code lines and plots.
+ - EEG_PGS_stats.htlm is the markdown documents including comments to the code lines and plots.
  
  
  Many thanks to Dr. Jennifer Lowe for supervising genetic data preprocessing and to Dr. Charlotte Tye for providing the phenotype dataset.
