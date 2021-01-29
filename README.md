@@ -1,5 +1,4 @@
-# PGS_EEG
-Polygenic contributions to face-sensitive cortical responses  in infants with a family history of autism
+# Analysis scripts for Polygenic contributions to face-sensitive cortical responses  in infants with a family history of autism
  
  - PGS_calc includes the main genotype data pre-processing steps (also described in Gui, A., Mason, L., Gliga, T., Hendry, A., Begum Ali, J., Pasco, G., . . . Jones, E. (2020). Look duration at the face as a developmental endophenotype: Elucidating pathways to autism and ADHD. 
  Development and Psychopathology, 32(4), 1303-1322. doi:10.1017/S0954579420000930 )and PRSice code for autism and cross-disorder (xDx) polygenic score (PGS) calculation.
