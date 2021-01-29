@@ -11,7 +11,12 @@ Polygenic contributions to face-sensitive cortical responses  in infants with a 
  xDx GWAS: Schork, A. J. et al. A genome-wide association study of shared risk across psychiatric disorders implicates gene regulation during fetal neurodevelopment. Nat. Neurosci. 22, 353–361 (2019).
  
  
+ 
+ 
+ 
  - EEG_PGS_gh.R is the R script for the statistical analyses testing the association between F-N N290 latency and the PGSs.
+ The F-N N290 latency pre-processing is described in Tye, C. et al. Understanding the nature of face processing in early autism: A prospective study. J. Abnorm. Psychol. (2020).
+ 
  
  - EEG_PGS_stats.htlm is the markdown documents including comments to the code lines and plots.
  
